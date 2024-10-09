@@ -1,0 +1,12 @@
+pandas
+h5py
+numpy
+matplotlib
+PyQt6
+obspy
+scipy
+scikit-learn
+category_encoders
+graphviz
+seaborn
+joblib
