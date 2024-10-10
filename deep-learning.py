@@ -1,7 +1,9 @@
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.metrics import accuracy_score, f1_score
 
 # TRAINING
 
@@ -20,10 +22,10 @@ for col in scale_col:
 def action_category(x: np.float64) -> float:
     # if max displacement > 5 cm -> 2: Severe earthquake, go outside the building
     if x > 0.05:
-        return 2
-    # if max displacement > 1 cm -> 1: Moderate earthquake, prepare for potential evacuation
-    elif x > 0.01:
         return 1
+    # if max displacement > 1 cm -> 1: Moderate earthquake, prepare for potential evacuation
+    # elif x > 0.01:
+    #     return 1
     # if max displacement < 1 cm -> 0: Minor earthquake, can stay inside the building
     else:
         return 0
@@ -82,18 +84,33 @@ y_test = torch.index_select(y_tensor, dim=0, index=indices[:80])
 print(f"x_train shape: {x_train.shape}")
 print(f"x_test shape: {x_test.shape}")
 
+y_train = y_train.squeeze().long()
+y_test = y_test.squeeze().long()
+
+
+# Check available resources
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(f"Available: {device}")
+
+# Run model from CUDA if available
+if torch.cuda.is_available():
+    model.cuda()
+
+
+x_train.to(device)
+y_train.to(device)
+x_test.to(device)
+y_test.to(device)
+
 
 # Define model
-class CancerClassifier(torch.nn.Module):
+class EarthquakeClassifier(torch.nn.Module):
     def __init__(self, input_size):
         super().__init__()
         self.layer_1 = torch.nn.Linear(input_size, 100)
-        self.layer_2 = torch.nn.Linear(100, 200)
-        self.layer_3 = torch.nn.Linear(200, 400)
-        self.layer_4 = torch.nn.Linear(400, 200)
-        self.layer_5 = torch.nn.Linear(200, 100)
-        self.layer_6 = torch.nn.Linear(100, 10)
-        self.layer_7 = torch.nn.Linear(10, 1)
+        self.layer_2 = torch.nn.Linear(100, 1000)
+        self.layer_3 = torch.nn.Linear(1000, 100)
+        self.layer_4 = torch.nn.Linear(100, 2)
 
         self.activation = torch.nn.ReLU()
 
@@ -101,10 +118,7 @@ class CancerClassifier(torch.nn.Module):
         x = self.activation(self.layer_1(x))
         x = self.activation(self.layer_2(x))
         x = self.activation(self.layer_3(x))
-        x = self.activation(self.layer_4(x))
-        x = self.activation(self.layer_5(x))
-        x = self.activation(self.layer_6(x))
-        return self.layer_7(x)
+        return self.layer_4(x)
 
 
 # Get total feature and use this as input size
@@ -112,23 +126,26 @@ input_size = X.shape[1]  # it has 30 features
 
 # Define loss function
 # BCEWithLogitsLoss => BCE + Sigmoid
-loss_fn = torch.nn.BCEWithLogitsLoss()
+loss_fn = torch.nn.CrossEntropyLoss()
 
 # Instantiate the model
-model = CancerClassifier(input_size)
+model = EarthquakeClassifier(input_size)
 
 # Define optimizer
-learning_rate = 1e-2
+learning_rate = 0.02
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
 # Write your code here for Model Training here
 dl_loss_value = 1
 
 # define the iteration
-num_epochs = 1500
+num_epochs = 100
+
 
 training_losses = []
 testing_losses = []
+print(y_train.shape)
+
 
 # create the training loop
 for epoch in range(num_epochs):
@@ -166,52 +183,69 @@ plt.show()
 
 print("Training complete!")
 
-# # TESTING
-# filename = "dataset-fixed-testing.csv"
-# earthquake_testing_df = pd.read_csv(filename, low_memory=False)
+# TESTING
+filename = "dataset-fixed-testing.csv"
+earthquake_testing_df = pd.read_csv(filename, low_memory=False)
 
-# # Scale the features (if needed, optional)
-# # Normal scaling: [x - min(x)] / [max(x) - min(x)]
-# scale_col = ["Mass", "Stiffness"]
-# for col in scale_col:
-#     earthquake_testing_df[col] = (
-#         earthquake_testing_df[col] - earthquake_testing_df[col].min()
-#     ) / (earthquake_testing_df[col].max() - earthquake_testing_df[col].min())
+# Scale the features (if needed, optional)
+# Normal scaling: [x - min(x)] / [max(x) - min(x)]
+scale_col = ["Mass", "Stiffness"]
+for col in scale_col:
+    earthquake_testing_df[col] = (
+        earthquake_testing_df[col] - earthquake_testing_df[col].min()
+    ) / (earthquake_testing_df[col].max() - earthquake_testing_df[col].min())
 
 
-# earthquake_testing_df["Run"] = earthquake_testing_df["MaxDisplacement"].apply(
-#     action_category
-# )
+earthquake_testing_df["Run"] = earthquake_testing_df["MaxDisplacement"].apply(
+    action_category
+)
 
-# # Split data into training set and test set
-# X: pd.DataFrame = earthquake_testing_df[ml_features]
-# y = earthquake_testing_df[ml_target]  # type: ignore
+# Split data into training set and test set
+X: pd.DataFrame = earthquake_testing_df[ml_features]
+y = earthquake_testing_df[ml_target]  # type: ignore
 
-# # Separate data: 20% Testing, 80% Training set
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.95)  # type: ignore
-# y_pred: NDArray[np.float64] = rf_model.predict(X_test)
-# print(X_test)
+# Convert diagnosis string to 1 (M) and 0 (B)
+# y.loc[:, 'Diagnosis'] = y['Diagnosis'].map({'M': 1, 'B': 0})
+# y = y.astype(int)
 
-# for i in range(3):
-#     tree = rf_model.estimators_[i]
-#     dot_data = export_graphviz(
-#         tree,
-#         feature_names=X_train.columns,
-#         filled=True,
-#         max_depth=2,
-#         impurity=False,
-#         proportion=True,
-#     )
-#     graph = graphviz.Source(dot_data)
-#     graph.render()
+# Convert from Pandas to Pytorch
+X_tensor = torch.tensor(X.values, dtype=torch.float32)
+y_tensor = torch.tensor(y.values, dtype=torch.float32)
 
-# # Testing accuracy and F1 score
-# ml_accuracy = accuracy_score(y_test, y_pred)
-# ml_f1_score = float(f1_score(y_true=y_test, y_pred=y_pred, average="weighted"))
+print(f"Feature shape: {X_tensor.shape}")
 
-# print(f"Accuracy: {ml_accuracy}")
-# print(f"F1 Score: {ml_f1_score}")
+# Split data into training and testing randomly
+indices = torch.randperm(X_tensor.size(0))
+x_train = torch.index_select(X_tensor, dim=0, index=indices[80:])
+y_train = torch.index_select(y_tensor, dim=0, index=indices[80:])
+x_test = torch.index_select(X_tensor, dim=0, index=indices[:80])
+y_test = torch.index_select(y_tensor, dim=0, index=indices[:80])
+print(f"x_train shape: {x_train.shape}")
+print(f"x_test shape: {x_test.shape}")
+
+y_train = y_train.squeeze().long()
+y_test = y_test.squeeze().long()
+
+# Testing accuracy and F1 score
+model.eval()
+y_pred_logits = model(x_train)
+y_pred = torch.argmax(y_pred_logits, dim=1)  # Get the index of the max logit
+
+print(f"y_train: {y_train}")
+print(f"y_pred: {y_pred}")
+
+ml_accuracy = accuracy_score(y_train.detach().numpy(), y_pred.detach().numpy())
+ml_f1_score = float(
+    f1_score(
+        y_true=y_train.detach().numpy(),
+        y_pred=y_pred.detach().numpy(),
+        average="weighted",
+    )
+)
+
+print(f"Accuracy: {ml_accuracy}")
+print(f"F1 Score: {ml_f1_score}")
 
 # # Save the trained model to a file
-# joblib.dump(rf_model, "earthquake_model.joblib")
-# print("Model saved as 'earthquake_model.joblib'")
+joblib.dump(model, "earthquake_model_DL.joblib")
+print("Model saved as 'earthquake_model_DL.joblib'")
