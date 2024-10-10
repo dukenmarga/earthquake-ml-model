@@ -8,9 +8,18 @@ import pandas as pd
 import seaborn as sns
 from numpy.typing import NDArray
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score  # type: ignore
+from sklearn.metrics import (
+    accuracy_score,  # type: ignore
+    f1_score,  # type: ignore
+    precision_score,  # type: ignore
+    recall_score,  # type: ignore
+)
 from sklearn.model_selection import train_test_split  # type: ignore
 from sklearn.tree import export_graphviz
+
+# Note:
+# Make sure dataset.csv and dataset-for-testing.csv is in the same folder
+# We separate the dataset into training and test set
 
 # TRAINING
 
@@ -37,7 +46,7 @@ def action_category(x: np.float64) -> float:
 
 earthquake_df["Run"] = earthquake_df["MaxDisplacement"].apply(action_category)
 
-# CORRELATION
+# Correlation
 numerical_columns = earthquake_df.select_dtypes(include=[np.number])
 for col in earthquake_df:
     # Skip
@@ -49,12 +58,12 @@ for col in earthquake_df:
     print(f"{col}: {corr:.2f}")
 
 # Identify the features you will use in your model
-# For clarity, ml feat is explicitly defined here (exluding Overall and Best Overall)
+# Others are comment out: low correlation number
 ml_features = [
     "PGA",
-    "PWaveFreq",
+    # "PWaveFreq",
     # "Mass",
-    "Stiffness",
+    # "Stiffness",
     # "Damping",
     "NaturalFreq",
 ]
@@ -74,7 +83,7 @@ sns.pairplot(
         ]
     ]
 )
-plt.show()
+# plt.show()
 _ = plt
 
 # Split data into training set and test set
@@ -85,10 +94,12 @@ y = earthquake_df[ml_target]  # type: ignore
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.05)  # type: ignore
 
 # Using Random Forest to predict
-rf_model = RandomForestClassifier()
+rf_model = RandomForestClassifier(max_depth=8, criterion="gini", n_estimators=200)
 rf_model.fit(X_train, y_train)
 
-# TESTING: use different set of earthquakes
+
+# TESTING
+# To use different set of earthquakes
 filename = "dataset-fixed-testing.csv"
 earthquake_testing_df = pd.read_csv(filename, low_memory=False)
 
@@ -128,9 +139,14 @@ for i in range(3):
 
 # Testing accuracy and F1 score
 ml_accuracy = accuracy_score(y_test, y_pred)
-ml_f1_score = float(f1_score(y_true=y_test, y_pred=y_pred, average="weighted"))
+ml_f1_score = float(f1_score(y_test, y_pred, average="weighted"))
+precision = precision_score(y_test, y_pred, average="weighted")
+recall = recall_score(y_test, y_pred, average="weighted")
+
 
 print(f"Accuracy: {ml_accuracy}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
 print(f"F1 Score: {ml_f1_score}")
 
 # Save the trained model to a file

@@ -12,6 +12,17 @@ from obspy import read
 from scipy.fft import fft, fftfreq  # type: ignore
 from scipy.signal import butter, filtfilt  # type: ignore
 
+# Function:
+# This function read acc/*.sac files and used it as ground motion
+# to calculate the structure response.
+# Before that, we need to determine:
+# - mass
+# - stiffness
+# - damping ratio
+# - etc.
+# The output is used for training only.
+# Output: dataset.csv
+
 
 # Newmark β method for solving differential equations
 def newmark_beta(
@@ -201,7 +212,7 @@ if __name__ == "__main__":
     dt = 0.01  # delta time in seconds
     # mass is based on:
     area = [36, 45, 72, 100]  # [m2]
-    mass_per_area = [25, 30, 45]  # [kg/m2]
+    mass_per_area = [36]  # [kg/m2]
     masses: list[float] = []
     masses = [a * w for a in area for w in mass_per_area]
 
@@ -210,9 +221,10 @@ if __name__ == "__main__":
         4 * 12 * 20000 * 0.3 * 0.3**3 / 12 / (4**3) * 1000,
         6 * 12 * 20000 * 0.3 * 0.3**3 / 12 / (4**3) * 1000,
         8 * 12 * 20000 * 0.3 * 0.3**3 / 12 / (4**3) * 1000,
-        4 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
-        6 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
-        8 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
+        9 * 12 * 20000 * 0.3 * 0.3**3 / 12 / (4**3) * 1000,
+        # 4 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
+        # 6 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
+        # 8 * 12 * 20000 * 0.2 * 0.2**3 / 12 / (4**3) * 1000,
     ]  # stiffness in KN/m
     dampings = [
         0.02,
@@ -272,42 +284,41 @@ if __name__ == "__main__":
             pga = peak_ground_acceleration(p_wave_acc)
 
             # Perform SDOF analysis for each combination of mass, stiffness, and damping
-            for mass in masses:
-                for k in ks:
-                    for damping in dampings:
-                        displacement, velocity, acceleration = sdof_analysis(
-                            ground_acc * amplification, dt, mass, k, damping
-                        )
+            for mass, k in zip(masses, ks):
+                for damping in dampings:
+                    displacement, velocity, acceleration = sdof_analysis(
+                        ground_acc * amplification, dt, mass, k, damping
+                    )
 
-                        # Get natural frequency of the structure
-                        natural_freq = np.sqrt(k / mass)
+                    # Get natural frequency of the structure
+                    natural_freq = np.sqrt(k / mass)
 
-                        # Plot response (for inspection)
-                        # plot_response(ground_acc, displacement, velocity, acceleration)
+                    # Plot response (for inspection)
+                    # plot_response(ground_acc, displacement, velocity, acceleration)
 
-                        # Get maximum values
-                        max_displacement = max(displacement)
-                        max_velocity = max(velocity)
-                        max_acceleration = max(acceleration)
+                    # Get maximum values
+                    max_displacement = max(displacement)
+                    max_velocity = max(velocity)
+                    max_acceleration = max(acceleration)
 
-                        # Print maximum values
-                        # print(f"Maximum displacement: {max_displacement:.6f} m")
-                        # print(f"Maximum velocity: {max_velocity:.6f} m/s")
-                        # print(f"Maximum acceleration: {max_acceleration:.6f} m/s²")
+                    # Print maximum values
+                    # print(f"Maximum displacement: {max_displacement:.6f} m")
+                    # print(f"Maximum velocity: {max_velocity:.6f} m/s")
+                    # print(f"Maximum acceleration: {max_acceleration:.6f} m/s²")
 
-                        # Arrange the feature and target response
-                        new_data = np.array(
-                            [
-                                pga,
-                                dominant_p_wave_freq,
-                                mass,
-                                k,
-                                damping,
-                                natural_freq,
-                                max_displacement,
-                            ]
-                        )
-                        dataset = np.vstack([dataset, new_data])
+                    # Arrange the feature and target response
+                    new_data = np.array(
+                        [
+                            pga,
+                            dominant_p_wave_freq,
+                            mass,
+                            k,
+                            damping,
+                            natural_freq,
+                            max_displacement,
+                        ]
+                    )
+                    dataset = np.vstack([dataset, new_data])
 
     # Save to csv
     df = pd.DataFrame(dataset)

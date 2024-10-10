@@ -10,6 +10,14 @@ from numpy.typing import NDArray
 from obspy import UTCDateTime
 from obspy.clients.fdsn.client import Client
 
+# Function:
+# This file will convert merge.csv and merge.hdf5 file into obspy stream
+# and save them in .sac format
+# Each .sac file will contain 3 traces of acceleration: E, N, Z (East, North, Vertical)
+# The .sac will be used as ground motion to calculate the structure response
+# The .sac data from this script is used for training only
+# Output: acc/*.sac
+
 
 # convert hdf5 to obspy stream
 def make_stream(dataset: Dataset):

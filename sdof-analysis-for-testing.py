@@ -11,6 +11,17 @@ from obspy import read
 from scipy.fft import fft, fftfreq  # type: ignore
 from scipy.signal import butter, filtfilt  # type: ignore
 
+# Function:
+# This function read acc/*.sac files and used it as ground motion
+# to calculate the structure response.
+# Before that, we need to determine:
+# - mass
+# - stiffness
+# - damping ratio
+# - etc.
+# The output is used for testing only.
+# Output: dataset.csv
+
 
 # Newmark β method for solving differential equations
 def newmark_beta(
