@@ -10,3 +10,4 @@ category_encoders
 graphviz
 seaborn
 joblib
+torch
