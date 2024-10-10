@@ -1,6 +1,8 @@
 import graphviz
 import joblib
 import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -25,13 +27,10 @@ for col in scale_col:
 
 
 def action_category(x: np.float64) -> float:
-    # if max displacement > 5 cm -> 2: Severe earthquake, go outside the building
-    if x > 0.05:
-        return 2
-    # if max displacement > 1 cm -> 1: Moderate earthquake, prepare for potential evacuation
-    elif x > 0.01:
+    # if max displacement > 1 cm -> 1: Moderate/Severe earthquake, go outside the building
+    if x > 0.01:
         return 1
-    # if max displacement < 1 cm -> 0: Minor earthquake, can stay inside the building
+    # else -> 0: Minor earthquake, can stay inside the building
     else:
         return 0
 
@@ -39,10 +38,7 @@ def action_category(x: np.float64) -> float:
 earthquake_df["Run"] = earthquake_df["MaxDisplacement"].apply(action_category)
 
 # CORRELATION
-# Correlation > 0.7 paired with Overall will be considered as important feature
-limit = 0.0
 numerical_columns = earthquake_df.select_dtypes(include=[np.number])
-feat = []
 for col in earthquake_df:
     # Skip
     if col in ["Run"]:
@@ -50,39 +46,36 @@ for col in earthquake_df:
 
     # Append feature that pass the correlation limit
     corr = earthquake_df["MaxDisplacement"].corr(earthquake_df[col])
-    if abs(corr) > limit:
-        print(f"{col}: {corr:.2f}")
-        feat.append(col)
-print(f"Significant features: {feat}\n")
+    print(f"{col}: {corr:.2f}")
 
 # Identify the features you will use in your model
 # For clarity, ml feat is explicitly defined here (exluding Overall and Best Overall)
 ml_features = [
     "PGA",
-    # "PWaveFreq",
+    "PWaveFreq",
     # "Mass",
-    # "Stiffness",
+    "Stiffness",
     # "Damping",
     "NaturalFreq",
 ]
 ml_target = ["Run"]
-# ml_features = feat
 
 # Pair plot
 sns.pairplot(
     earthquake_df[
         [
             "PGA",
-            "PWaveFreq",
-            "Mass",
-            "Stiffness",
-            "Damping",
-            "NaturalFreq",
+            # "PWaveFreq",
+            # "Mass",
+            # "Stiffness",
+            # "Damping",
+            # "NaturalFreq",
             "MaxDisplacement",
         ]
     ]
 )
 plt.show()
+_ = plt
 
 # Split data into training set and test set
 X: pd.DataFrame = earthquake_df[ml_features]
@@ -95,7 +88,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.05)  # typ
 rf_model = RandomForestClassifier()
 rf_model.fit(X_train, y_train)
 
-# TESTING
+# TESTING: use different set of earthquakes
 filename = "dataset-fixed-testing.csv"
 earthquake_testing_df = pd.read_csv(filename, low_memory=False)
 
@@ -119,7 +112,6 @@ y = earthquake_testing_df[ml_target]  # type: ignore
 # Separate data: 20% Testing, 80% Training set
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.95)  # type: ignore
 y_pred: NDArray[np.float64] = rf_model.predict(X_test)
-print(X_test)
 
 for i in range(3):
     tree = rf_model.estimators_[i]
@@ -143,4 +135,5 @@ print(f"F1 Score: {ml_f1_score}")
 
 # Save the trained model to a file
 joblib.dump(rf_model, "earthquake_model.joblib")
+_ = joblib
 print("Model saved as 'earthquake_model.joblib'")
