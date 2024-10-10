@@ -90,10 +90,6 @@ def convert_signal_to_acceleration(file_name: str, ev_list: list[str]) -> None:
 
     # Processing each event
     for i, evi in enumerate(ev_list):
-        if i < 62:
-            continue
-        if i >= 100:
-            break
         print(f"progress: {i+1}/{total} {evi}")
 
         # read data
