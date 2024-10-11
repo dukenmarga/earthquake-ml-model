@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from huggingface_hub import HfApi, HfFolder, create_repo, login
 from numpy.typing import NDArray
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -153,3 +154,25 @@ print(f"F1 Score: {ml_f1_score}")
 joblib.dump(rf_model, "earthquake_model.joblib")
 _ = joblib
 print("Model saved as 'earthquake_model.joblib'")
+
+# Push to Huggingface Hub
+login()
+create_repo(repo_id="dukenmarga/earthquake-model", private=False)
+
+
+# Set repository details
+model_name = "earthquake-model"  # Your repository name
+model_path = "earthquake_model.joblib"  # Path to your model file
+
+# Get your access token (it should be automatically available after login)
+token = HfFolder.get_token()
+
+# Upload the model file
+api = HfApi()
+api.upload_file(
+    path_or_fileobj=model_path,
+    path_in_repo="earthquake_model.joblib",
+    repo_id=f"dukenmarga/{model_name}",
+    repo_type="model",
+    token=token,
+)
