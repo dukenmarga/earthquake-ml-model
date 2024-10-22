@@ -11,3 +11,4 @@ graphviz
 seaborn
 joblib
 torch
+huggingface_hub
